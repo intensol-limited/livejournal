@@ -54,6 +54,7 @@ module LiveJournal
     attr_accessor :allowmask
     attr_accessor :screening # values {:default, :all, :anonymous, :nonfriends, :none}
     attr_accessor :interface # values {:web, ...}
+    attr_accessor :journalname,:postername
 
     # A hash of any leftover properties (including those in KNOWN_EXTRA_PROPS)
     # that aren't explicitly supported by ljrb.  (See the
@@ -92,7 +93,7 @@ module LiveJournal
       [:subject, :event, :moodid,
        :mood, :music, :location, :taglist, :pickeyword,
        :preformatted, :backdated, :comments, :security, :allowmask,
-       :screening, :props,:journalname, :postertype].each do |attr|
+       :screening, :props,:journalname, :postername].each do |attr|
         return false if send(attr) != other.send(attr)
       end
       # compare time fields one-by-one because livejournal ignores the
