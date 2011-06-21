@@ -84,13 +84,15 @@ module LiveJournal
       @allowmask = nil
       @screening = :default
       @props = {}
+      @journalname = nil
+      @postername = nil
     end
 
     def ==(other)
       [:subject, :event, :moodid,
        :mood, :music, :location, :taglist, :pickeyword,
        :preformatted, :backdated, :comments, :security, :allowmask,
-       :screening, :props].each do |attr|
+       :screening, :props,:journalname, :postertype].each do |attr|
         return false if send(attr) != other.send(attr)
       end
       # compare time fields one-by-one because livejournal ignores the
@@ -131,6 +133,26 @@ module LiveJournal
       self
     end
 
+    def friends_entry_from_request(req)
+      @itemid = req['ditemid'].to_i
+      @subject, @event = req['subject_raw'], CGI.unescape(req['event'])
+      @journalname, @postername = req['journalname'], req['postername']
+      case req['security']
+      when 'public'
+        @security = :public
+      when 'private'
+        @security = :private
+      when 'usemask'
+        if req['allowmask'] == '1'
+          @security = :friends
+        else
+          @security = :custom
+          @allowmask = req['allowmask'].to_i
+        end
+      end
+
+      self
+    end
     def load_prop(name, value, strict=false) #:nodoc:#
       case name
       when 'current_location'
@@ -336,6 +358,52 @@ module LiveJournal
 
         if @request.has_key? 'itemid'
           return entries[@request['itemid']]
+        else
+          return entries
+        end
+      end
+    end
+
+    class GetFriendsPage < Req
+      def initialize(user, opts)
+        super(user, 'getfriendspage')
+        @request['lineendings'] = 'unix'
+
+        @strict = true
+        @strict = opts[:strict] if opts.has_key? :strict
+
+        if opts.has_key? :itemid
+          @request['selecttype'] = 'one'
+          @request['itemid'] = opts[:itemid]
+        elsif opts.has_key? :recent
+          @request['selecttype'] = 'lastn'
+          @request['howmany'] = opts[:recent]
+        elsif opts.has_key? :lastsync
+          @request['selecttype'] = 'syncitems'
+          @request['lastsync'] = opts[:lastsync] if opts[:lastsync]
+        else
+          raise ArgumentError, 'invalid options for GetFriendsPage'
+        end
+      end
+
+      # Returns either a single #Entry or a hash of itemid => #Entry, depending
+      # on the mode this was constructed with.
+      def run
+        super
+
+        entries = {}
+        each_in_array('entries') do |req|
+          entry = Entry.new.friends_entry_from_request(req)
+          entries[entry.itemid] = entry
+        end
+
+        each_in_array('prop') do |prop|
+          itemid = prop['itemid'].to_i
+          entries[itemid].load_prop(prop['name'], prop['value'], @strict)
+        end
+
+        if @request.has_key? 'ditemid'
+          return entries[@request['ditemid']]
         else
           return entries
         end
