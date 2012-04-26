@@ -89,7 +89,7 @@ module LiveJournal
         p request if @verbose
         return if @dryrun
         response, data = h.post('/interface/flat', request)
-        parseresponse(data)
+        parseresponse(data || response.body)
         dumpresponse if @verbose
         if @result['success'] != "OK"
           raise ProtocolException, @result['errmsg']
